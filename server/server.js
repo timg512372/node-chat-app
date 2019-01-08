@@ -24,10 +24,8 @@ io.on('connection', socket => {
         if (user) {
             console.log('User disconnected');
 
-            socket.broadcast.to(user.room).emit('updateUserList', users.getUserList(user.room));
-            socket.broadcast
-                .to(user.room)
-                .emit('newMessage', generateMessage('Admin', `${user.name} has left.`));
+            io.to(user.room).emit('updateUserList', users.getUserList(user.room));
+            io.to(user.room).emit('newMessage', generateMessage('Admin', `${user.name} has left.`));
         }
     });
 
@@ -39,7 +37,7 @@ io.on('connection', socket => {
         socket.join(params.room);
         users.removeUser(socket.id);
         users.addUser(socket.id, params.name, params.room);
-        socket.broadcast.to(params.room).emit('updateUserList', users.getUserList(params.room));
+        io.to(params.room).emit('updateUserList', users.getUserList(params.room));
 
         socket.emit('newMessage', generateMessage('Admin', 'Welcome to the chat app'));
 
@@ -51,16 +49,24 @@ io.on('connection', socket => {
     });
 
     socket.on('createMessage', (message, callback) => {
-        console.log('New Message: ', message);
-        io.emit('newMessage', generateMessage(message.from, message.text));
-        callback('This is from the server.');
+        let user = users.getUser(socket.id);
+
+        if (user && isRealString(message.text)) {
+            io.to(user.room).emit('newMessage', generateMessage(user.name, message.text));
+            callback('This is from the server.');
+        }
     });
 
     socket.on('createLocationMessage', coords => {
-        io.emit(
-            'newLocationMessage',
-            generateLocationMessage('Admin', coords.latitude, coords.longitude)
-        );
+        let user = users.getUser(socket.id);
+        console.log('createLocationmessage');
+
+        if (user) {
+            io.to(user.room).emit(
+                'newLocationMessage',
+                generateLocationMessage(user.name, coords.latitude, coords.longitude)
+            );
+        }
     });
 
     // socket.emit('newMessage', {
